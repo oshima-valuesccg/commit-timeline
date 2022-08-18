@@ -3,6 +3,7 @@ import { IronSessionData } from "iron-session";
 import { NextApiRequest, NextApiResponse } from "next";
 import { withSession } from "../../../lib/middleware/session";
 import dayjs from 'dayjs';
+import { mockData } from "../../../lib/mock";
 
 export type Since = {
     type: 'day' | 'week' | 'month' | 'year',
@@ -184,15 +185,13 @@ const fetchEachRepositoryCommits = async (repository: ContributedRepository, acc
                                                     since: $since
                                                 ){
                                                     nodes {
-                                                        ... on Commit {
-                                                            message
-                                                            url
-                                                            committedDate
-                                                            oid
-                                                            changedFiles
-                                                            additions
-                                                            deletions
-                                                        }
+                                                        message
+                                                        url
+                                                        committedDate
+                                                        oid
+                                                        changedFiles
+                                                        additions
+                                                        deletions
                                                     }
                                                 }
                                             }
@@ -236,6 +235,12 @@ export const commitListRoute = async (
     const { accessToken, name: userName, email } = user;
     if (!email) {
         res.status(401).end();
+        return;
+    }
+    if (process.env.USE_MOCK) {
+        res.status(200).json({
+            commits: mockData
+        });
         return;
     }
     const { since: { type, quantity } } = req.body as CommitListParam;
@@ -299,15 +304,6 @@ export const commitListRoute = async (
     const commitsList: Commit[][] = await Promise.all(contributedRepositories.map((repository) => {
         return fetchEachRepositoryCommits(repository, accessToken, email, since)
     }));
-
-    // const rateLimitResponse = await axios.get(
-    //     `https://api.github.com/rate_limit`, {
-    //     headers: {
-    //         'Accept': 'application/vnd.github+json',
-    //         'Authorization': `token ${accessToken}`
-    //     }
-    // });
-    // console.dir(rateLimitResponse.data, { depth: null });
 
     const shaCommitMap = new Map<string, ResponseCommit>();
     commitsList.flat().forEach(({ sha, url, message, branch, date, repository, changedFiles, additions, deletions }) => {
